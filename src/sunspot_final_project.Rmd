@@ -1,0 +1,775 @@
+---
+title: "Monthly mean total sunspot number analysis and forecast"
+author: "Klismam F. Pereira"
+date: "26/01/2021"
+output:
+  html_document: default
+  pdf_document: default
+subtitle: Time Series and Forecasting -  Final Project
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      fig.width=7,
+                      fig.height=4, 
+                      fig.align = "center")
+```  
+
+___  
+
+# Introduction  
+
+**Sunspots** are earth sized dark areas that occur at the surface of the Sun, and are commonly found in pairs that have magnetic fields pointing in diverging directions. In them, the magnetic field is higher than anywhere else on the Sun's photosphere (i.e. surface), and 2500 times stronger than Earth's own field. They appear as darker spots because they're colder than the surrounding area - while sunspots temperature is around 3593.33 ºC, the Sun's surface is around 5537.78 ºC. These spots are usually composed of a darker region called *umbra*, and a lighter surrounding region called *penumbra* (Weather Forecast Office, National Weather Service n.d. [[1]](https://www.weather.gov/fsd/sunspots)).  
+
+Sunspots are strongly related to **solar flares** and to **geomagnetic storms** that occur here on earth. Solar flares are gigantic explosions that happen near sunspots, and can release up to a billion megatons of TNT of energy. They also emit x-rays and magnetic fields that cause said geomagnetic storms. As a result, during sunspot maxima, more solar flares and more geomagnetic storms happen. It is quite important to understand when said events take place, since **their effects on our daily lives can be quite disruptive**, among which are the increase in Northern and Southern lights, possible disruption in radio transmissions and power grids, damaging electronics in satellites, etc (Weather Forecast Office, National Weather Service n.d. [[1]](https://www.weather.gov/fsd/sunspots)).  
+
+Given their impact, it is needless to stress how important it is to understand their mechanisms. For that end, the **sunspot number** is used. The sunspot number, also called sunspot index, is the oldest solar activity index used to characterize the Sun's **eleven year cyclical behavior**. It can be found in the abstract of several papers, and has application in many fields of study such as climatology, meteorology, space physics, etc (Weather Forecast Office, National Weather Service n.d. [[1]](https://www.weather.gov/fsd/sunspots), Berghmans et al. n.d. [[2]](http://www.sidc.be/silso/IMAGES/about/Berghmansetal2006.pdf)).  
+
+It's history begins when sunspots started being systematically observed in the 17th century after the invention of the telescope. Years later, in 1843 Heinrich Schwabe published his discovery on the ten-year cycle of the number of sunspots, as a result of studying his recordings of the number of sunspots observed daily since 1826. The effects of the solar magnetic cycle had already been observed in 1803, though, when Ritter reported that auroras are more commonly sighted during specific time intervals, nowadays called solar maxima (Berghmans et al. n.d. [[2]](http://www.sidc.be/silso/IMAGES/about/Berghmansetal2006.pdf)).  
+
+Only in 1852 Ewdward Sabine, chief British promoter of magnetic studies, pointed out the "coincidence" between the period and epochs of minima and maxima described by H. Schwabe and the ones found for magnetic variation, and in the same year Rudolf Wolf presented his results showing that the actual period was of 11.1 years. He also derived spot numbers from scattered data back to 1749. Later, with more observatories at disposal and interested in the matter, the continuity of  counts is preserved through joint effort (Berghmans et al. n.d. [[2]](http://www.sidc.be/silso/IMAGES/about/Berghmansetal2006.pdf)).  
+
+In 1980, the production of the sunspot index, i.e. the **International Sunspot Number**  becomes responsibility of the Sunspot Index Data Center (SIDC), of the Royal Observatory of Belgium. Under their administration, the number of contributing stations doubled in a few years, improving accuracy and stability of the international sunspot number, and in the 2000, the SIDC became a Regional Warning Center for the Western Europe, which is a space weather forecast and monitoring center of the International Space Environment Service (Berghmans et al. n.d. [[2]](http://www.sidc.be/silso/IMAGES/about/Berghmansetal2006.pdf)).  
+
+Space weather is an emerging science with great and direct relevance to technological systems. Beyond the already noted impacts, solar influences might have an important effect on the evolution of the earth's climate, thus understanding the solar cyclic activity is important to humanity as whole (Weather Forecast Office, National Weather Service n.d. [[1]](https://www.weather.gov/fsd/sunspots), Berghmans et al. n.d. [[2]](http://www.sidc.be/silso/IMAGES/about/Berghmansetal2006.pdf)).  
+
+# Objective  
+
+Given the importance of such an interesting subject, this project's aim is to explore the monthly mean total sunspot number using time series analysis tools, explain some of the series behavior by fitting models from the ARIMA and Exponential Smoothing families, and finally obtain forecasts based on the best of these models, chosen through criteria such as the information criterion and forecast metrics.  
+
+All data process, analysis, and model fitting is done with *R*, a language and environment for statistical computing and graphics.    
+
+# The time series  
+
+The time series consists of the monthly mean total sunspot number from 01/1749 to 11/2020. As described in the introduction section, the earliest records were compiled by Rudolph Wolf. The monthly mean total sunspot number is obtained by calculating the average of the number of daily total sunspot number over each month (Berghmans et al. n.d. [[2]](http://www.sidc.be/silso/IMAGES/about/Berghmansetal2006.pdf), Sunspot data from the World Data Center SILSO [[3]](http://www.sidc.be/silso/datafiles)).  
+
+The data set contains seven features - Year, Month, Date in fraction of year, Monthly mean total sunspot number, Monthly mean standard deviation of the input sunspot numbers, Number of observations used to compute the monthly mean total sunspot number, Definitive/Provisional marker (1 means the value is definitive, 0 means its still provisional) (Sunspot data from the World Data Center SILSO [[3]](http://www.sidc.be/silso/datafiles)).  
+
+From the seven features, three are used in this project:  
+
+* Year  
+* Month  
+* Monthly mean total sunspot number  
+
+___  
+
+# Exploratory Data Analisys  
+
+In this section, the time series is explored graphically, and its main characteristics are described. The monthly mean total sunspot number for the two first and last years are shown.
+
+```{r imports, message=FALSE, warning=FALSE}
+library(astsa)
+library(forecast)
+library(tseries)
+library(zoo)
+library(knitr)
+```  
+
+```{r read_data}
+df <- read.csv2("../data/SN_m_tot_V2.0.csv", header = FALSE, 
+                col.names = c("Year", 
+                              "Month", 
+                              "Date.fraction", 
+                              "mean.total.sunspot", 
+                              "mean.standard.deviation",
+                              "Number.of.observations", 
+                              "definitive.marker"), 
+                colClasses = c("character", 
+                               "integer", 
+                               "NULL", 
+                               "character", 
+                               "NULL",
+                               "NULL", 
+                               "NULL"))
+
+df$mean.total.sunspot <- as.numeric(df$mean.total.sunspot)
+
+first_year <- df$Year[1]
+first_month <- df$Month[1]
+
+sunspot.ts <- ts(df$mean.total.sunspot, start=first_year, frequency=12)
+
+head(sunspot.ts, 24)
+tail(sunspot.ts, 23)
+```  
+
+The following plot represents the complete time series and its respective QQ-plot. It seems 25 sunspot maxima occurred since 1750, and latest entries suggest the latest minimum is already past. The cycles observed are compatible with the long 11 year period description given in the introduction section. There is no clear trend, and the cycles aren't ruled by the more common  yearly seasonality found in several time series. Differences in the maxima magnitudes imply heteroscedasticity, or non-constant variance. There are no discontinuities or abrupt changes in this specific time period. The QQ-plot denotes departure from normality in the lower and upper quantiles. The prior might be due to the sunspot number having a minimum of zero counts.   
+
+```{r complete_ts_plot}
+layout(matrix(1:2,1), widths=c(2.5,1))
+par(mgp=c(1.6,.6,0), mar=c(2,2,.5,0)+.5)
+
+tsplot(sunspot.ts,
+       main="monthly mean total sunspot number",
+       ylab = "", col=4, margin=0)
+qqnorm(sunspot.ts, main="", col=4); qqline(sunspot.ts, col=2, lwd=2)   
+```  
+
+Two smaller periods of the time series are plotted below. The first graphic presents a window from 1900 to 1950, where the 11 years cycle is more evident. The second focus on the period between 1900 and 1915, in what it seems to be a full cycle. There appears to be some cyclic behavior within the 11 year cycle, but its frequency can't be pinpointed to yearly seasonality.  
+
+```{r windows_ts_plot}
+par(mfrow=c(2,1))
+tsplot(window(x=sunspot.ts, start=1900, end=1950), 
+       main="Monthly mean total sunspot - 1900 to 1950", ylab = "", col=4)
+
+tsplot(window(x=sunspot.ts, start=1900, end=1915),
+       main="Monthly mean total sunspot - 1900 to 1915", ylab = "", col=4)
+```  
+
+Now, both ACF and PACF graphics for 144 lags are shown (i.e. twelve years).   
+
+```{r complete_acf_pacf}  
+sunspot.acf.pacf <- acf2(sunspot.ts, max.lag=144, 
+                         main="Series: monthly mean total sunspot number")
+```  
+
+The ACF presents high correlations that do not seem to be decaying to zero, even though 144 lags are shown. This is characteristic of a long-memory process, in which correlations persist for a long time (Shumway & Stoffer, 2015 [[4]](https://www.stat.pitt.edu/stoffer/tsa4/tsa4.pdf)).  
+
+Correlations change signals at around the three years mark (i.e. 36 lags) and reach a new negative maximum at around 5 years (i.e. 60 lags). The correlations change signal again and arrive at positive maximum close to 11 years (i.e. 132 lags). At a first glance, this ACF plot may imply some of the long cyclical behavior described in previous paragraphs, with high correlations occurring 5 and 11 years apart. The PACF presents high correlations at lags one to four, and there are also smaller partial correlations that are outside the significance threshold in the negative side of the plot.  
+
+## Box-Cox transformation and train/test split
+
+First, the time series is divided into train and test data sets in order to allow forecast evaluation. The test set comprises the last twelve months of observations - from 12/19 to 11/20 - and the train set has data from 01/1749 to 11/2019.  
+
+```{r train_test_split}
+traindat <- window(sunspot.ts, c(1749, 1), c(2019, 11))
+testdat <- window(sunspot.ts, c(2019, 12), c(2020, 11))
+```
+
+A Box-Cox transformation will be applied to stabilize variability, and thus improve approximation to normality. The plot below shows the Box-Cox transformed time series and its QQ-plot. Variability seems reduced, and the sample quantiles tend to comply with the theoretical, with the exception of the lower quantiles under two standard deviations. The parameter $\lambda$ for the Box-Cox transformation is equal to 0.45.  
+
+```{r boxcox}
+lambd <- BoxCox.lambda(traindat)#df$mean.total.sunspot)
+sunspot.BC <- BoxCox(traindat, lambda = lambd) #df$mean.total.sunspot
+sunspot.BC <- ts(sunspot.BC, start=first_year, frequency=12)
+
+layout(matrix(1:2,1), widths=c(2.5,1))
+par(mgp=c(1.6,.6,0), mar=c(2,2,.5,0)+.5)
+tsplot(sunspot.BC,
+       main="Box-Cox of monthly mean total sunspot number",
+       ylab = "",
+       col=4)
+qqnorm(sunspot.BC, main="", col=4); qqline(sunspot.BC, col=2, lwd=2)
+```  
+
+The ACF and PACF plots of the Box-Cox transformed series are shown below. Their behavior is remarkably similar to what was observed and described in the original series correlation plots.  
+
+```{r BC_acf_pacf}  
+sunspot.acf.pacf <- acf2(sunspot.BC, max.lag=72, 
+                         main="Series: Box-Cox monthly mean total sunspot number")
+```  
+
+As before, the ACF plot indicates a long-memory process, for which an ARFIMA model might be appropriate, while the PACF plots exhibits significant correlations for lags one to four. It is not clear which degrees of a simpler auto-regressive (AR), moving average (MA) or ARIMA model would be an interesting first approach. Thus, experiments using the Box-Jenkins method for model selection, as well as the functions *auto.arima* and *arfima* (both from *R* package *forecast*) are described in the next section.  
+
+# ARIMA models experimentation and selection  
+
+## Box-Jenkins method  
+
+In this section the Box-Jenkins method is used to select and fit an ARIMA model to train data. Overall, the method consists on the following steps (Holmes et al. 2021[[5]](https://nwfsc-timeseries.github.io/atsa-labs/)):  
+
+1. Evaluate stationarity  
+2. Selection of the differencing level (d) – to fix stationarity problems  
+3. Selection of the AR level (p)  
+4. Selection of the MA level (q)  
+5. Parameter estimation  
+6. Model checking  
+
+The output below presents the results of the Augmented Dickey–Fuller (ADF) and Kwiatkowski-Phillips-Schmidt-Shin (KPSS) unit root tests, used to aid in the selection of a proper difference order. The low p-value for the ADF test suggests evidence in favor of the aternative hypothesis that the time-series is stationary. That said, the p-value equal to 0.01 from the KPSS test provides evidence against the null hypothesis that the time-series is trend stationary. Even though the ADF test suggested stationarity, the result of the KPSS test, ACF (correlations are not decaying to zero), and PACF plots indicate a non stationary series, in which some differencing is required (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)).  
+
+```{r adf1_kpss1}
+adf.test(sunspot.BC,alternative="s")
+# Augmented Dickey Fuller test: null hypothesis is that the data arenon-stationary and non-seasonal.
+
+kpss.test(sunspot.BC, null = "T")
+#Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test: null hypothesis isthat the data are stationary and non-seasonal.
+#Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test: reverses thehypotheses, so the null-hypothesis is that the data are stationary inlevel or trend
+#In this case, small p-values (e.g., less than 0.05) suggest that differencing is required.
+```   
+
+Below, several plots are shown to aid in the selection of a proper order for simple ($d$) and seasonal ($D$) differentiations. Note that until now seasonality is not a major feature of this series, and indeed the ACF and PACF plots related to seasonal differences (*i.e.* the ones that contain $\Delta_{12}$) are not similar to the observed in a white noise process. Given the characteristics of the phenomena, it makes sense it is not ruled by earth's seasonality. Through the plots, it is decided that a simple differentiation ($d = 1$) might suffice to explain correlation in the series.  
+
+```{r grid_ts_acf_pacf}
+ly <- sunspot.BC
+dly1 <- diff(ly)
+dly12 <- diff(ly,12)
+dly12_1 <- diff(diff(ly),12)
+
+maxlag <- 20
+par(mfrow=c(3,4), mar=c(3,3,4,2))
+
+plot(ly, main = expression("Box-Cox(y)"))
+plot(dly1, main = expression(paste(Delta, "Box-Cox(y)")))
+plot(dly12, main = expression(paste(Delta[12], "Box-Cox(y)")))
+plot(dly12_1, main = expression(paste(Delta, Delta[12], "Box-Cox(y)")))
+
+Acf(ly, type='correlation', lag=maxlag, ylab="", main=expression(paste("ACF for Box-Cox(y)")))
+Acf(dly1, type='correlation', lag=maxlag, na.action=na.omit, ylab="", main=expression(paste("ACF for ", Delta,"Box-Cox(y)")))
+Acf(dly12, type='correlation', lag=maxlag, na.action=na.omit, ylab="", main=expression(paste("ACF for ", Delta[12], "Box-Cox(y)")))
+Acf(dly12_1, type='correlation', lag=maxlag, na.action=na.omit, ylab="", main=expression(paste("ACF for ", Delta, Delta[12], "Box-Cox(y)")))
+
+Acf(ly, type='partial', lag=maxlag, na.action=na.omit, ylab="", main=expression(paste("PACF for Box-Cox(y)")))
+Acf(dly1, type='partial', lag=maxlag, na.action=na.omit, ylab="", main=expression(paste("PACF for ", Delta, "Box-Cox(y)")))
+Acf(dly12, type='partial', lag=maxlag, na.action=na.omit, ylab="", main=expression(paste("PACF for ", Delta[12], "Box-Cox(y)")))
+Acf(dly12_1, type='partial', lag=maxlag, na.action=na.omit, ylab="", main=expression(paste("PACF for ", Delta,Delta[12], "Box-Cox(y)")))
+
+```
+
+Next, a first difference is applied to address the high correlations previously shown in the ACF plot. The time series, ACF, and PACF plots of the differenced series are shown again in more detail below. The time series plot resembles a white noise process - stationary, zero mean, approximately constant variance - while the ACF plot exhibits low correlations. That said, partial auto correlation values outside the significance threshold remain in the PACF plot.  
+
+```{r diff}
+sp.bc.d1 <- diff(sunspot.BC)
+
+tsplot(sp.bc.d1, 
+       main = expression(paste(
+         Delta, "Box-Cox monthly mean total sunspot number"
+         )),
+       ylab = "")
+
+sunspot.acf.pacf <- acf2(sp.bc.d1,
+                         max.lag = 144,
+                         main = expression(
+                           paste("Series: ",
+                                 Delta, 
+                                 " Box-Cox monthly mean total sunspot number")
+                           )
+                         )
+```
+
+The plots hint at a close to stationary process. One may infer that an $ARIMA(0,1,2)$ model might be appropriate to represent the time series since the PACF does not exhibit a cut-off while the ACF decays quickly, with a cut-off at lag two. From that, an experiment considering such a model is carried.  
+
+Nevertheless, the following output from the model fit reveals that even though both MA components have significant effects given that their confidence intervals do not contain zero, and the standardized residuals comply with a Normal distribution, their ACF exhibit correlations marginally outside of the significance threshold, and the Ljung-Box statistic presents low  p-values, providing evidence that the residuals are in fact correlated.  
+
+```{r ljung_box}
+myLB <- function(x.fit){
+  res=NULL
+  npar= length(coef(x.fit))
+  for (i in (npar+1):20){
+    q=Box.test(x.fit$residuals,lag=i,type="Ljung-Box",fitdf=npar)
+    res[i]=q$p.value}
+  return(res)}
+```
+```{r arima012}
+mdl1.v2 <- Arima(traindat, order = c(0,1,2), lambda = lambd)
+mdl1.v2
+# cat("\n95% Confidence Interval for estimates:\n")
+# confint(mdl1.v2)
+```
+```{r arima0122, echo=FALSE, results='asis'}
+kable(confint(mdl1.v2), 
+      align = "c", 
+      caption = "95% Confidence Interval for estimates")
+
+mdl1.resid <- resid(mdl1.v2)
+
+par(mfrow=c(2,2))
+tsplot(mdl1.resid, main="Residuals from SARIMA(0,1,2)", ylab = "")
+temp <- acf(mdl1.resid)
+plot(myLB(mdl1.v2),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(mdl1.resid)
+qqline(mdl1.resid, col="red")
+```
+
+Experiments were carried considering different orders for the AR component of the model. The output below is relative to an $ARIMA(2,1,2)$ model, in which the effect of all coefficients is significant, but the Ljung-Box statistic signals for some correlation among residuals at lags 18 and 19 (*i.e.* p-values under the significance threshold).  
+
+```{r arima212}
+mdl2.v2 <- Arima(traindat, order = c(2,1,2), lambda = lambd)
+mdl2.v2
+# cat("\n95% Confidence Interval for estimates:\n")
+# confint(mdl2.v2)
+```
+```{r arima2122, echo=FALSE, results='asis'}
+kable(confint(mdl2.v2), 
+      align = "c", 
+      caption = "95% Confidence Interval for estimates")
+
+mdl2.resid <- resid(mdl2.v2)
+
+par(mfrow=c(2,2))
+tsplot(mdl2.resid, main="Residuals from SARIMA(2,1,2)", ylab = "")
+temp <- acf(mdl2.resid)
+plot(myLB(mdl2.v2),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(mdl2.resid)
+qqline(mdl2.resid, col="red")
+```
+
+Below, an $ARIMA(2,1,3)$ model is also fit. As with $ARIMA(2,1,2)$, the effect of all estimates is significant, but the Ljung-Box statistic show marginally significant correlation among residuals. That said, both models might be useful and shall be tested in forecasting.  
+
+```{r arima213}
+mdl3.v2 <- Arima(traindat, order = c(2,1,3), lambda = lambd)
+mdl3.v2
+# cat("\n95% Confidence Interval for estimates:\n")
+# confint(mdl3.v2)
+```
+```{r arima2132, echo=FALSE, results='asis'}
+kable(confint(mdl3.v2), 
+      align = "c", 
+      caption = "95% Confidence Interval for estimates")
+
+mdl3.resid <- resid(mdl3.v2)
+
+par(mfrow=c(2,2))
+tsplot(mdl3.resid, main="Residuals from SARIMA(2,1,3)", ylab = "")
+temp <- acf(mdl3.resid)
+plot(myLB(mdl3.v2),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(mdl3.resid)
+qqline(mdl3.resid, col="red")
+```
+
+An $ARIMA(2,1,4)$ model is also fit. Its *ma4* coefficient is not significant because the 95% confidence interval contains zero, thus this model is rejected as it would potentially cause overfitting.  
+
+```{r arima214}
+mdl0.v2 <- Arima(traindat, order = c(2,1,4), lambda = lambd)
+mdl0.v2
+# cat("\n95% Confidence Interval for estimates:\n")
+# confint(mdl0.v2)
+```
+```{r arima2142, echo=FALSE, results='asis'}
+kable(confint(mdl0.v2), 
+      align = "c", 
+      caption = "95% Confidence Interval for estimates")
+
+mdl0.resid <- resid(mdl0.v2)
+
+par(mfrow=c(2,2))
+tsplot(mdl0.resid, main="Residuals from SARIMA(2,1,4)", ylab = "")
+temp <- acf(mdl0.resid)
+plot(myLB(mdl0.v2),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(mdl0.resid)
+qqline(mdl0.resid, col="red")
+```
+
+## auto.arima()  
+
+Next the function $auto.arima$ from package $forecast$ is tested in order to obtain a benchmark for our selections. It suggests a $SARIMA(1,0,2)(1,0,0)_{12}$ model. As with other models evaluated, it fails to return uncorrelated residuals according to the Ljung-Box test.  
+
+```{r autoarima}
+mdl4.auto <- auto.arima(traindat, lambda = lambd)
+mdl4.auto
+# cat("\n95% Confidence Interval for estimates:\n")
+# confint(mdl4.auto)
+```
+```{r autoarima2, echo=FALSE, results='asis'}
+kable(confint(mdl4.auto), 
+      align = "c", 
+      caption = "95% Confidence Interval for estimates")
+
+mdl4.auto.resid <- resid(mdl4.auto)
+
+par(mfrow=c(2,2))
+tsplot(mdl4.auto.resid, main="Residuals from SARIMA(1,0,2)(1,0,0)12", ylab = "")
+temp <- acf(mdl4.auto.resid)
+plot(myLB(mdl4.auto),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(mdl4.auto.resid)
+qqline(mdl4.auto.resid, col="red")
+```  
+
+## ARFIMA  
+
+Finally, since the time series ACF plot presented characteristics of a long-memory process - correlations that do not decay to zero, persisting for a long time - a fractionally differenced ARFIMA model is fit. ARFIMA are useful in situations where differencing can be too harsh of an alteration. The function *arfima* from the package *forecast* returned an $ARFIMA(2, 0.42, 4)$ model, in which all coefficients are significant. Nevertheless, the Ljung-Box statistic shows that residuals are correlated (Shumway & Stoffer, 2015 [[4]](https://www.stat.pitt.edu/stoffer/tsa4/tsa4.pdf)).   
+
+```{r ARFIMA}
+arfima.mdl <- arfima(traindat,
+                     drange = c(0, 0.5),
+                     estim = c("mle", "ls"),
+                     model = NULL,
+                     lambda = lambd,
+                     biasadj = FALSE
+                     )
+summary(arfima.mdl)
+```
+```{r ARFIMA2, echo=FALSE, results='asis'}
+kable(confint(arfima.mdl), 
+      align = "c", 
+      caption = "95% Confidence Interval for estimates")
+
+arfima.resid <- resid(arfima.mdl);
+
+par(mfrow=c(2,2))
+tsplot(arfima.resid, main="Residuals from ARFIMA(2,0.42,4)", ylab = "")
+temp <- acf(arfima.resid)
+plot(myLB(arfima.mdl),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(arfima.resid)
+qqline(arfima.resid, col="red")
+```  
+
+## ARIMA models selection  
+
+Models $ARIMA(2,1,2)$ and $ARIMA(2,1,3)$ display residuals marginally correlated, while the models fit by the functions *auto.arima* and *arfima* from the package *forecast*, $SARIMA(1,0,2)(1,0,0)_{12}$ and $ARFIMA(2, 0.42, 4)$ respectively, exhibit significant p-values for the Ljung-Box statistic. The residuals from all models present low correlations in the respective ACF plots, and adhere to the Gaussian distribution according to each QQ-plots. 
+Even though the Ljung-Box statistic for some suggested rejection of the null hypothesis of uncorrelated residuals, all four models quoted in this paragraph will be used in forecasting and evaluation.  
+
+Models $ARIMA(0,1,2)$ and $ARIMA(2,1,4)$ will not be used. The first presents high correlation among residuals and the highest AIC ($14868$) among the simple differenced models fit. The second presents a non significant coefficient that may lead to overfitting.  
+
+The table below exhibits the chosen models' orders, number of parameters, as well as AIC, AICc, and BIC metrics. These models were fit using the package *forecast* to keep consistency among calculations.  
+
+```{r chosen_table, echo=FALSE, results='asis'}
+Model <- c("mdl1", "mdl2", "mdl3","mdl4")
+Order <- c("$ARIMA(2,1,2)$",
+           "$ARIMA(2,1,3)$",
+           "$SARIMA(1,0,2)(1,0,0)_{12}$",
+           "$ARFIMA(2,0.42,4)$")
+N.par <- c(length(coef(mdl2.v2)),
+           length(coef(mdl3.v2)),
+           length(coef(mdl4.auto)),
+           length(coef(arfima.mdl))
+           )
+AIC <- round(c(mdl2.v2$aic, 
+               mdl3.v2$aic,
+               mdl4.auto$aic,
+               AIC(arfima.mdl)), 2)
+AICc <- round(c(mdl2.v2$aicc,
+                mdl3.v2$aicc,
+                mdl4.auto$aicc,
+                MuMIn::AICc(arfima.mdl)), 2)
+BIC <- round(c(mdl2.v2$bic,
+               mdl3.v2$bic,
+               mdl4.auto$bic,
+               BIC(arfima.mdl)), 2)
+table.1 <- data.frame(cbind(Model, Order, N.par, AIC, AICc, BIC))
+
+kable(table.1, align = "c", caption = "Chosen ARIMA models")  
+```  
+
+Information criterion should only be compared among ARIMA models of the same orders of differencing (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)). The information criterion of the first differenced models are very similar - $ARIMA(2,1,2)$ has a lower BIC while $ARIMA(2,1,3)$ has lower AIC and AICc. All four models will be used in later sections to generate forecasts that can be evaluated regarding the test data set. Next, convenient Exponential Smoothing models are also chosen to enrich the discussion.  
+
+# Exponential Smoothing (ES) models experimentation and selection  
+
+## Simple Exponential Smoothing (SES)  
+
+The simplest exponential smoothing method is convenient to forecast data without trend or seasonal patterns, which might be the case of the dataset in question. The forecasts of SES are equivalent to an ARIMA(0,1,1) model. The *ets* function of package *forecast* is used with model parameters set to "ZNN", in which the first letter denotes the error type, the second denotes the trend type, and the third denotes the season type - "N" for none, "A" for additive, "M" for multiplicative, and "Z" for automatically selected. Model selection is based on the information criterion, while parameters and initial values are estimated by minimizing the sum of squared errors (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)).      
+
+The output below presents the fit parameter $\alpha = 0.4972$, implying that some weight is given to older observations in the past, given that the rate at which the weights decrease is controlled by the parameter $\alpha$, the smoothing parameter for the level. The Ljung-Box statistic plot suggest correlation among residuals.  
+
+```{r ses}
+es1.ses <- ets(traindat, model="ZNN", lambda = lambd)
+es1.ses
+
+es1.resid <- es1.ses$residuals
+
+par(mfrow=c(2,2))
+tsplot(es1.resid, main="Residuals from ETS(A, N, N)", ylab = "")
+temp<-acf(es1.resid)
+plot(myLB(es1.ses),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(es1.resid)
+qqline(es1.resid, col="red")
+```
+
+## Holt's Linear Trend method  
+
+This extension of SES allows forecasting of data with trend. The forecasts of Holt's method are equivalent to an ARIMA(0,2,2) model. The *ets* function of package *forecast* is used with model parameters set to "ZAN" (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)).  
+
+The output below presents the fit smoothing parameter for the level $\alpha = 0.4426$, implying that some weight is given to older observations in the past, and the smoothing parameter for the trend $\beta  = 0.0159$, which suggests the slope changes very little over time.  
+
+Note that the automatic selection determined a damped trend component, symbolized by the subscript *d* in ETS(A,Ad,N). The forecasts of Damped Holt's method are equivalent to an ARIMA(1,1,2) model. Sometimes damping is required because ETS methods tend to over-forecast. The estimated damping parameter $\phi = 0.9412$ suggests the model is quite close to non-damped Holt's linear method. The Ljung-Box statistic plot suggest correlation among residuals.  
+
+```{r holt}
+es2.holt <- ets(traindat, model="ZAN", lambda = lambd)
+es2.holt
+
+es2.resid <- es2.holt$residuals
+
+par(mfrow=c(2,2))
+tsplot(es2.resid, main="Residuals from ETS(A, Ad, N)", ylab = "")
+temp<-acf(es2.resid)
+plot(myLB(es2.holt),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(es2.resid)
+qqline(es2.resid, col="red")
+```
+
+## Additive Holt-Winters’ seasonal method  
+
+This extension of Holt's method allows for the forecast of time series with seasonal components. We've seen in previous sections that the dataset present no evident seasonality, thus this model might not be the most convenient. The forecasts of Holt-Winter's method are equivalent to an $ARIMA(0,1,m+1)(0,1,0)_m$ model, where *m* is the frequency of the seasonality. The *ets* function of package *forecast* is used with model parameters set to "ZAA" (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)).    
+
+The output below presents the fit smoothing parameter for the level $\alpha = 0.438$, implying that some weight is given to older observations in the past, and the smoothing parameter for the trend $\beta  = 0.0163$, which suggests the slope changes very little over time. Again, a damped trend component is selected, and the estimated damping parameter $\phi = 0.9445$ suggests the model is quite close to non-damped one. The very small estimated smoothing parameter for the seasonality $\gamma = 1e-04$ means the seasonal component barely changes over time, thus the component might be neglected. The Ljung-Box statistic plot suggest correlation among residuals.  
+
+
+```{r holt_winters}
+es3.hw <- ets(traindat, model="ZAA", lambda = lambd)
+es3.hw
+
+es3.resid <- es3.hw$residuals
+
+par(mfrow=c(2,2))
+tsplot(es3.resid, main="Residuals from ETS(A, Ad, A)", ylab = "")
+temp<-acf(es3.resid)
+plot(myLB(es3.hw),ylim=c(0,1), main="Ljung-Box statistic", ylab = "p-value")
+abline(h=0.05,col="blue",lty=2)
+qqnorm(es3.resid)
+qqline(es3.resid, col="red")
+```
+
+## ES models selection
+
+All ES models showed correlated residuals that, nevertheless, adhere to Gaussian distribution quantiles. That said, the damped Additive Holt-Winters’ seasonal method presented a very small $\gamma$ estimate, thus it'll be discarded. The table below exhibits the remaining models' orders, number of parameters, as well as AIC, AICc, and BIC metrics. Both models present similar information criterion metrics, being the AIC and AICc of $ETS(A,N,N)$ higher, and its BIC lower than the $ETS(A,Ad,N)$ model. These models were fit using the package *forecast* to keep consistency among calculations. Both models are used in the next section, along with the chosen ARIMA models, to generate forecasts that can be evaluated regarding the test data set.  
+
+```{r chosen_table_es, echo=FALSE, results='asis'}
+Model <- c("es1.ses", "es2.holt")
+Order <- c("$ETS(A,N,N)$", "$ETS(A,Ad,N)$")
+N.par <- c(length(es1.ses$par), length(es2.holt$par))
+AIC <- round(c(es1.ses$aic, es2.holt$aic), 2)
+AICc <- round(c(es1.ses$aicc, es2.holt$aicc), 2)
+BIC <- round(c(es1.ses$bic, es2.holt$bic), 2)
+table.2 <- data.frame(cbind(Model, Order, N.par, AIC, AICc, BIC))
+
+kable(table.2, align = "c", caption = "Chosen ETS models")  
+```  
+
+# Forecasting and evaluation  
+
+In this section twelve months forecasts are obtained from the chosen models are evaluated against test data through the scale dependent metrics Root Mean Squared Error (RMSE) and Mean Absolute Error (MAE), the scale-free error metric Mean Absolute Scaled Error (MASE), and Theil's U statistic. The twelve months forecasts as well as the test data are relative to the months of 12/2019 to 11/2020.  
+
+## Forecasting with ARIMA models  
+
+```{r arima.prediction}
+hmax <- 12
+lvl <- 95
+
+mdl2.v2.pred <- forecast(mdl2.v2, h=hmax, level = lvl)
+mdl3.v2.pred <- forecast(mdl3.v2, h=hmax, level = lvl)
+mdl4.pred <- forecast(mdl4.auto, h=hmax, level = lvl)
+arfima.pred <- forecast(arfima.mdl, h=hmax, level = lvl)
+```  
+
+The plots below present the twelve months forecasts from chosen models of the ARIMA family as well as their 95% prediction intervals. For each model, the time series on the left presents observed data from 01/2010 to 11/2020, which represents the last observed 11 years sunspot cycle, while the time series on the right presents data from 11/2019 to 11/2020 (represented as 2019.8 and 2020.8 in the x axis). Both show forecasts as a blue line, and 95% prediction intervals as a shaded area in gray.  
+
+It seems models $ARIMA(2,1,2)$ and $ARIMA(2,1,3)$ forecasts underestimate the monthly mean total sunspot number, and fail to include the last observation in their respective prediction intervals. Their forecasts are very similar to the last case of the train set, relative to 11/2019.  
+
+Models $ARIMA(1,0,2)(1,0,0)_{12}$ and $ARFIMA(2, 0.42, 4)$ appear to better represent the long cycles that are a characteristic of this time series, returning slowly increasing forecasts, and including all observations in their respective prediction intervals.
+Indeed, the fractionally differenced ARFIMA model may exhibit the best representation of the series dynamics thus far.  
+
+```{r arima.prediction.plots}
+par(mfrow=c(2,2), cex=0.7, mar=c(2,4,3,1))
+
+tsplot(mdl2.v2.pred,
+     xlim=c(2010,2020.8), 
+     ylim=c(-20, 170), ylab = "")
+lines(testdat)
+
+tsplot(mdl2.v2.pred,
+     xlim=c(2019.8,2020.8),
+     ylim=c(-20, 45),
+     type="b", ylab = "")
+lines(testdat,
+      type ="b",
+      col= "red")
+
+tsplot(mdl3.v2.pred, 
+     xlim=c(2010,2020.8),
+     ylim=c(-20, 170), ylab = "")
+lines(testdat)
+
+tsplot(mdl3.v2.pred, 
+     xlim=c(2019.8,2020.8),
+     ylim=c(-20, 45),
+     type="b", ylab = "")
+lines(testdat,
+      type ="b",
+      col= "red")
+
+par(mfrow=c(2,2), cex=0.7, mar=c(2,4,3,1))
+
+tsplot(mdl4.pred, 
+     xlim=c(2010,2020.8),
+     ylim=c(-5, 170),
+     main = "Forecasts from ARIMA(1,0,2)(1,0,0)[12]", ylab = "")
+lines(testdat)
+
+tsplot(mdl4.pred, 
+     xlim=c(2019.8,2020.8),
+     ylim=c(-5, 45),
+     type="b",
+     main = "Forecasts from ARIMA(1,0,2)(1,0,0)[12]", ylab = "")
+lines(testdat,
+      type ="b", 
+      col= "red")
+
+tsplot(arfima.pred, 
+     xlim=c(2010,2020.8),
+     ylim=c(-5, 170), ylab = "")
+lines(testdat)
+
+tsplot(arfima.pred, 
+     xlim=c(2019.8,2020.8), 
+     ylim=c(-5, 50),
+     type="b", ylab = "")
+lines(testdat,
+      type ="b",
+      col= "red")
+```  
+  
+## Forecasting with ES models  
+  
+```{r ets.prediction}
+ses.pred <- forecast(es1.ses, h=hmax, level = lvl)
+holt.pred <- forecast(es2.holt, h=hmax, level = lvl)
+```  
+
+Similar plots are shown below for the ES models. It occurs that both $ETS(A,N,N)$ (SES) and $ETS(A, Ad, N)$ (damped Holt's Linear Trend) models also underestimate the observed data and do not enclose the last case in their prediction intervals. As with the $ARIMA(p,1,q)$ models, their forecasts are very similar to the last case of the train set.   
+
+```{r ets.prediction.plots}
+par(mfrow=c(2,2), cex=0.7, mar=c(2,4,3,1))
+
+tsplot(ses.pred, xlim=c(2010,2020.8), ylim=c(-20, 170), ylab = "")
+lines(testdat)
+
+tsplot(ses.pred, xlim=c(2019.8,2020.8), ylim=c(-20, 45), type="b", ylab = "")
+lines(testdat,type ="b", col= "red")
+
+tsplot(holt.pred, xlim=c(2010,2020.8), ylim=c(-20, 170), ylab = "")
+lines(testdat)
+
+tsplot(holt.pred, xlim=c(2019.8,2020.8), ylim=c(-20, 45),type="b", ylab = "")
+lines(testdat,type ="b", col= "red")
+```  
+
+## Evaluation   
+
+The following output displays each model's forecast scores in ascending order. As suspected, forecasts from $ARFIMA(2, 0.42, 4)$ returned the best metrics, thus it is the best model to explain the series dynamics, *i.e.* the eleven year cycle. Note that the Ljung-Box test for the model did suggest correlation among residuals, but in practice the best model found is used even if it do not pass all tests (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)).  
+
+The $SARIMA(1,0,2)(1,0,0)_{12}$ model performed better than the remaining ES and ARIMA models, which presented overall similar scores and could not take the cycles into account.  
+
+```{r evaluation, echo=FALSE, results='asis'}
+testdat.BC <- BoxCox(testdat, lambda = lambd)
+
+metrics <- c("RMSE", "MAE", "MASE", "Theil's U")
+
+mdl1.scores <- accuracy(mdl2.v2.pred, testdat)[2, metrics]
+mdl2.scores <- accuracy(mdl3.v2.pred, testdat)[2, metrics]
+mdl3.scores <- accuracy(mdl4.pred, testdat)[2, metrics]
+mdl4.scores <- accuracy(arfima.pred, testdat)[2, metrics]
+ses.scores <- accuracy(ses.pred, testdat)[2, metrics]
+holt.scores <- accuracy(holt.pred, testdat)[2, metrics]
+
+Model <- c("$ARIMA(2,1,2)$",
+           "$ARIMA(2,1,3)$",
+           "$SARIMA(1,0,2)(1,0,0)_{12}$",
+           "$ARFIMA(2,0.42,4)$",
+           "$ETS(A,N,N)$", 
+           "$ETS(A,Ad,N)$"
+           )
+
+table.3 <- data.frame(cbind(Model,
+                            round(rbind(mdl1.scores,
+                                        mdl2.scores,
+                                        mdl3.scores,
+                                        mdl4.scores,
+                                        ses.scores,
+                                        holt.scores
+                                        ), 2)
+                            ), row.names = NULL)
+
+table.3 <- table.3[order(table.3$Theil.s.U),]
+row.names(table.3) <- NULL
+
+kable(table.3,
+      align = "c",
+      caption = "Models' 12 month forecast scores against test data")  
+```  
+
+## ARFIMA model forecasts  
+
+In this final section, we take a closer look at the forecasts from the chosen $ARFIMA(2, 0.42, 4)$ model. The table below presents the forecasts 95% prediction intervals (*Lo.95* and *Hi.95*), a factor column (*contains.case*) that denotes if the observed value is within the interval, the observed value, the point forecast, and the absolute error. Note that percentage errors are not adequate considering that in some months the sunspot number is equal to or close to zero.  
+
+```{r final.table, echo=FALSE, results='asis'}
+Date <- as.character(format(as.yearmon(time(testdat)), "%m-%Y"))
+Point.Forecast <- arfima.pred$mean
+Lo.95 <- arfima.pred$lower
+Hi.95 <- arfima.pred$upper
+contains.case <- as.factor(testdat > Lo.95 & testdat < Hi.95)
+Observed.value <- testdat
+error <- abs(testdat - arfima.pred$mean)
+
+Point.Forecast <- round(Point.Forecast, 2)
+Lo.95 <- round(Lo.95, 4)
+Hi.95 <- round(Hi.95, 4)
+error <- round(error, 2)
+
+inter <- data.frame(cbind(
+  Date,
+  Lo.95, 
+  Hi.95,
+  contains.case,
+  Observed.value,
+  Point.Forecast,
+  error))
+
+kable(inter, 
+      align = "c", 
+      caption = "ARFIMA(2,0.42,4) forecast analysis",
+      )
+```  
+
+All the cases are within the 95% prediction intervals. The absolute error for the predicted monthly mean sunspot number seems constant until September, when it increases suddenly. This might be explained by the new eleven year cycle maxima, which appears to start being formed by the end of 2020. The graphic below exhibits the forecast as a blue line along with the prediction interval as a shaded gray area.  
+
+```{r arfima.plot}
+tsplot(arfima.pred, 
+     xlim=c(2019.8,2020.8), 
+     ylim=c(-5, 50),
+     type="b", ylab = "monthly mean total sunspot number")
+lines(testdat,
+      type ="b",
+      col= "red")
+```
+
+Finally, the plot below represents a forecast for twenty two years after 11/2019. It demonstrates how the ARFIMA model is able to reproduce some of the long cyclic behavior observed in the original time series, effectively delineating the two eleven year cycles that are due to the period considered. Of course, forecasts tend to be less reliable the farther from the last observation, given their prediction intervals increase as the forecast horizon increases (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)).     
+
+```{r 11yforecast}
+big.forecast <- forecast(arfima.mdl, h = 2*12*11, level = lvl)
+tsplot(big.forecast,
+       main = "22 year forecast from ARFIMA(2,0.42,4)",
+       ylab = "monthly mean total sunspot number",
+       col=1)
+```
+
+# Conclusion  
+
+The sunspot number is an index used in several fields of study and applied sciences. 
+The Sun's  eleven year cyclical behavior is well documented, and has direct influence in the number of observed sunspots, in turn related to solar flares and to geomagnetic storms, which can affect our daily lives. In this project the mean monthly sunspot number time series was analyzed in order to select a convenient model to represent its dynamics and obtain reasonable forecasts.   
+
+The exploratory data analysis proved essential in guiding data processing, namely the Box-Cox transformation to stabilize variance, as well as identifying the time series major characteristics, particularly the long-memory behavior, in which correlation between lags extend far in time.
+Unit root tests Augmented Dickey–Fuller and Kwiatkowski-Phillips-Schmidt-Shin were used to determine the necessary order of differencing, and guided the manual selection of ARIMA family models. 
+Automatic model selection functions were also used to determine a *SARIMA* and an *ARFIMA* model, the first acted as a benchmark to the manual selections, and the second was motivated by the quoted long-memory behavior observed.  
+
+According to the Ljung-Box test the $ARIMA(p, 1, q)$ models chosen had some level of correlation among its residuals, while the *SARIMA* and *ARFIMA* models had significant p-values for all lags tested.
+The information criterion (AIC, AICc, and BIC) could only be used to determine a better model among those with equal difference order, specifically the $ARIMA(2,1,2)$ and $ARIMA(2,1,3)$ models, which showed very similar values.  
+
+Experiments were also carried with Exponential Smoothing models. 
+More specifically, models based on the methods Simple Exponential Smoothing($ETS(A,N,N)$) and damped Holt's Linear Trend ($ETS(A, Ad, N)$) showed relevant smoothing parameter estimates, while the model based on Additive Holt-Winters’ seasonal method displayed a very low estimate for the seasonal component, thus was discarded. 
+The ES models also shown significant p-values regarding the Ljung-Box test. 
+The information criterion of both models were very similar.  
+
+A twelve month forecast was obtained from all six models, *i.e.* $ARIMA(2,1,2)$, $ARIMA(2,1,3)$, $SARIMA(1,0,2)(1,0,0)_{12}$, $ARFIMA(2,0.42,4)$, $ETS(A,N,N)$, and $ETS(A,Ad,N)$.
+The forecasts were evaluated against the test data set, comprised of the mean monthly sunspot number from 12/2019 to 11/2020.
+The *ARFIMA* model performed better than the remaining, followed by the *SARIMA* model. 
+ES models and the ARIMA models with order $d=1$ had similar metrics, and couldn't account for the eleven year cycle observed in the series, as their predictions were very similar to the last observations of the train data set.  
+
+Finally, a closer look was taken on forecasts obtained from the best model, $ARFIMA(2,0.42,4)$. The observed values were within the prediction intervals, and errors seemed to increase by the end of the forecast period, when a new solar maxima begins to form. That said, the fractionally differenced model is capable of reproducing the eleven year cycle to an extent, as seen in the last plot relative to a 22 years forecast.  
+
+It is interesting to note that although the *ARFIMA* model did not pass the Ljung-Box test, its forecasts displayed the best metrics among models. Therefore, it may be possible that yet another model could better explain the time series dynamics, and that the prediction intervals are incorrect. That said, in reality the best model might not pass all statistical tests, which do not make the model less useful or the tests less important (Hyndman & Athanasopoulos, 2018 [[6]](https://otexts.com/fpp2/)).  
+
+We conclude by remarking on the similar performance of $ARIMA(p,1,q)$ and *ES* models, even though they were not the most convenient choice considering the problem at hand. As described by Hyndman and Athanasopoulos (2018), there are *ARIMA* models that do not have an *ES* counterpart, and the reciprocal is true, thus surely each family of models can be successfully applied to different problems.  
+
+Future extensions of this project might consider improving on the best model found thus far, specifically regarding the correlation among residuals noted in the Ljung-Box test, and exploring different approaches for forecasting the sunspont number.  
+
+___  
+
+# REFERENCES  
+
+[1] Weather Forecast Office, National Weather Service n.d., *The Sun and Sunspots, Sioux Falls, SD, United States of America*, viewed 23 December 2020, <https://www.weather.gov/fsd/sunspots>.  
+
+[2] Berghmans, D.,Van der Linden, R.A.M., Vanlommel, P., Clette, F., Robbrecht, E. n.d., *History of the Sunspot Index: 25 years SIDC*, SIDC, Royal Observatory of Belgium,  Ringlaan -3- Av. Circulaire, B1180 Brussels, Belgium, viewed 23 December 2020, <http://www.sidc.be/silso/IMAGES/about/Berghmansetal2006.pdf>.  
+
+[3] *Sunspot data from the World Data Center SILSO*, Royal Observatory of Belgium, Brussels, viewed 23 December 2020, <http://www.sidc.be/silso/datafiles>.  
+        
+[4] Shumway, R.H., & Stoffer, D.S., 2015, *Time Series Analysis and Its Applications With R Examples*, 4th edition, Springer, viewed 26 January 2021, <https://www.stat.pitt.edu/stoffer/tsa4/tsa4.pdf>.  
+
+[5] Holmes, E.E., Scheuerell, M.D., Ward E.J., 2021, *Applied Time Series Analysis for Fisheries and Environmental Sciences*, NOAA Fisheries, Northwest Fisheries Science Center, 2725 Montlake Blvd E., Seattle, WA 98112, viewed 26 January 2021, <https://nwfsc-timeseries.github.io/atsa-labs/>.  
+
+[6] Hyndman, R.J., & Athanasopoulos, G., 2018, *Forecasting: principles and practice*, 2nd edition, OTexts: Melbourne, Australia. OTexts.com/fpp2, viewed 26 January 2021, <https://otexts.com/fpp2/>.
