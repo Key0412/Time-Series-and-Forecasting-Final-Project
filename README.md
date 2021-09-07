@@ -1,5 +1,7 @@
 # Time-Series-and-Forecasting-Final-Project
-In this project I analyze and process the Monthly Mean Total Sunspot Number in order to evaluate ARIMA and ES model regarding a twelve months forecast metrics against test data.  
+In this project I analyze and process the Monthly Mean Total Sunspot Number in order to evaluate ARIMA and ES model regarding a twelve months forecast metrics against test data. 
+The project was done using R.
+The PDF of the project 'sunspot_final_project.pdf' can be found in the folder 'output'.
 
 ## Objective:
 
